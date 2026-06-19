@@ -8,7 +8,7 @@ license = { text = "MIT" }
 dependencies = [
     "fastapi==0.115.6",
     "uvicorn[standard]==0.34.0",
-    "python-socketio[client]==5.12.1",
+    "python-socketio[client]==5.16.3",
     "websocket-client==1.8.0",
     "pydantic==2.10.4",
     "slowapi==0.1.9",
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["pytest==8.3.4"]
+test = ["pytest==9.1.1"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
