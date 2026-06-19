@@ -103,6 +103,17 @@ class Beat(BaseModel):
     important: Optional[bool] = None
 
 
+class MonitorListOut(BaseModel):
+    monitors: list[MonitorOut]
+    count: int
+
+
+class BeatsOut(BaseModel):
+    monitor_id: int
+    hours: int
+    beats: list[dict[str, Any]]
+
+
 class HealthOut(BaseModel):
     status: str
     detail: Any = None

@@ -10,6 +10,9 @@ A small, self-hostable **REST API for Uptime Kuma 2.x**.
 Using **Coolify**? See **[COOLIFY.md](COOLIFY.md)** — add the API to an existing Kuma
 stack with one compose block and three env vars.
 
+**API docs:** full request/response reference in **[API.md](API.md)**, plus live
+interactive docs at **`/docs`** (Swagger) and the schema at **`/openapi.json`**.
+
 Uptime Kuma has no official REST API — only an internal Socket.IO interface. The
 popular `uptime_kuma_api` Python library targets Kuma 1.21–1.23 and breaks on
 2.2.x (creating monitors fails on the new `conditions` column). This project is a

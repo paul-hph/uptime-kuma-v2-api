@@ -20,7 +20,9 @@ from .kuma_client import (
     KumaClient, KumaError, KumaNotFound, KumaTimeout, KumaUnavailable,
 )
 from .monitors import defaults
-from .monitors.schemas import ActionResult, CreateResult, MonitorCreate, MonitorOut, MonitorPatch
+from .monitors.schemas import (
+    ActionResult, BeatsOut, CreateResult, MonitorCreate, MonitorListOut, MonitorOut, MonitorPatch,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 log = logging.getLogger("api")
@@ -107,7 +109,7 @@ async def ready():
 
 
 # ---------------- reads ----------------
-@app.get("/v1/monitors", dependencies=[Depends(require_api_key)])
+@app.get("/v1/monitors", dependencies=[Depends(require_api_key)], response_model=MonitorListOut)
 @limiter.limit(settings.RATE_LIMIT)
 async def list_monitors(request: Request, stale_ok: bool = False):
     h = client.health()
@@ -122,7 +124,7 @@ async def list_monitors(request: Request, stale_ok: bool = False):
                         headers={"X-Kuma-Cache-Age": str(age) if age is not None else "n/a"})
 
 
-@app.get("/v1/monitors/{monitor_id}", dependencies=[Depends(require_api_key)])
+@app.get("/v1/monitors/{monitor_id}", dependencies=[Depends(require_api_key)], response_model=MonitorOut)
 @limiter.limit(settings.RATE_LIMIT)
 async def get_monitor(request: Request, monitor_id: int):
     # serve cache only when fresh (Codex P1-4); otherwise verify live
@@ -136,7 +138,7 @@ async def get_monitor(request: Request, monitor_id: int):
     return MonitorOut.from_kuma(mon).model_dump()
 
 
-@app.get("/v1/monitors/{monitor_id}/beats", dependencies=[Depends(require_api_key)])
+@app.get("/v1/monitors/{monitor_id}/beats", dependencies=[Depends(require_api_key)], response_model=BeatsOut)
 @limiter.limit(settings.RATE_LIMIT)
 async def get_beats(request: Request, monitor_id: int, hours: int = Query(24, ge=1, le=720)):
     resp = await kcall("getMonitorBeats", (monitor_id, hours))
@@ -158,7 +160,7 @@ async def create_monitor(request: Request, body: MonitorCreate):
     return CreateResult(monitorID=resp.get("monitorID"), msg=resp.get("msg"))
 
 
-@app.patch("/v1/monitors/{monitor_id}", dependencies=[Depends(require_api_key)])
+@app.patch("/v1/monitors/{monitor_id}", dependencies=[Depends(require_api_key)], response_model=ActionResult)
 @limiter.limit(settings.RATE_LIMIT)
 async def patch_monitor(request: Request, monitor_id: int, body: MonitorPatch):
     current = await fetch_monitor(monitor_id)  # fetch-merge-edit
@@ -173,7 +175,7 @@ async def patch_monitor(request: Request, monitor_id: int, body: MonitorPatch):
     return ActionResult(msg=out.get("msg") if isinstance(out, dict) else None)
 
 
-@app.delete("/v1/monitors/{monitor_id}", dependencies=[Depends(require_api_key)])
+@app.delete("/v1/monitors/{monitor_id}", dependencies=[Depends(require_api_key)], response_model=ActionResult)
 @limiter.limit(settings.RATE_LIMIT)
 async def delete_monitor(request: Request, monitor_id: int):
     out = await kcall("deleteMonitor", monitor_id, mutation=True)
@@ -181,14 +183,14 @@ async def delete_monitor(request: Request, monitor_id: int):
     return ActionResult(msg=out.get("msg") if isinstance(out, dict) else None)
 
 
-@app.post("/v1/monitors/{monitor_id}/pause", dependencies=[Depends(require_api_key)])
+@app.post("/v1/monitors/{monitor_id}/pause", dependencies=[Depends(require_api_key)], response_model=ActionResult)
 @limiter.limit(settings.RATE_LIMIT)
 async def pause_monitor(request: Request, monitor_id: int):
     out = await kcall("pauseMonitor", monitor_id, mutation=True)
     return ActionResult(msg=out.get("msg") if isinstance(out, dict) else None)
 
 
-@app.post("/v1/monitors/{monitor_id}/resume", dependencies=[Depends(require_api_key)])
+@app.post("/v1/monitors/{monitor_id}/resume", dependencies=[Depends(require_api_key)], response_model=ActionResult)
 @limiter.limit(settings.RATE_LIMIT)
 async def resume_monitor(request: Request, monitor_id: int):
     out = await kcall("resumeMonitor", monitor_id, mutation=True)
