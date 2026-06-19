@@ -1,0 +1,26 @@
+# Uptime Kuma V2 API against an EXISTING Uptime Kuma instance.
+# Put this behind a TLS reverse proxy (Caddy/nginx/Traefik/Cloudflare) in production.
+services:
+  uptime-kuma-v2-api:
+    image: ghcr.io/paul-hph/uptime-kuma-v2-api:latest
+    pull_policy: always
+    # To build locally instead, comment the image line and uncomment: build: .
+    # build: .
+    environment:
+      KUMA_SERVER: "${KUMA_SERVER:-http://uptime-kuma:3001}"
+      KUMA_USERNAME: "${KUMA_USERNAME:?set KUMA_USERNAME}"
+      KUMA_PASSWORD: "${KUMA_PASSWORD:?set KUMA_PASSWORD}"
+      API_KEYS: "${API_KEYS:?set API_KEYS (comma-separated strong random keys)}"
+      RATE_LIMIT: "${RATE_LIMIT:-120/minute}"
+      FORWARDED_ALLOW_IPS: "${FORWARDED_ALLOW_IPS:-127.0.0.1}"
+      # KUMA_TOTP_SECRET: "${KUMA_TOTP_SECRET:-}"  # 2FA not supported in v1
+    ports:
+      # Bind to loopback by default; put a TLS reverse proxy in front.
+      # Change to "8000:8000" only if the host is already firewalled/trusted.
+      - "127.0.0.1:8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys;sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3).status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
