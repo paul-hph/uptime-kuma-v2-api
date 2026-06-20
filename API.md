@@ -130,6 +130,31 @@ Send only the fields you want to change (same names/bounds as create).
 
 ---
 
+## Tags
+
+### `GET /v1/tags` — list tags
+```json
+{ "tags": [ { "id": 1, "name": "HostingKunden", "color": "#4caf50" } ] }
+```
+
+### `POST /v1/tags` — create a tag
+**Request:** `{ "name": "HostingKunden", "color": "#4caf50" }` → **Response:** the created `TagOut`.
+
+### `POST /v1/monitors/{id}/tags` — attach a tag to a monitor
+By id **or** by name (find-or-create):
+```json
+{ "tag_id": 1 }
+// or
+{ "name": "HostingKunden", "color": "#4caf50", "value": "" }
+```
+**Response `200`:** `{ "ok": true, "msg": "tag added" }`.
+`GET /v1/monitors/{id}` then includes a `tags` array.
+
+### `DELETE /v1/monitors/{id}/tags/{tag_id}?value=` — detach a tag
+**Response `200`:** `{ "ok": true, "msg": "tag removed" }`.
+
+---
+
 ## Mutation timeout note (important)
 A `504` on `POST`/`PATCH`/`DELETE`/pause/resume means Kuma did not acknowledge in time —
 the change **may or may not** have been applied. The API does **not** auto-retry mutations

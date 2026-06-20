@@ -22,6 +22,7 @@ from .kuma_client import (
 from .monitors import defaults
 from .monitors.schemas import (
     ActionResult, BeatsOut, CreateResult, MonitorCreate, MonitorListOut, MonitorOut, MonitorPatch,
+    MonitorTagIn, TagCreate, TagOut, TagsOut,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -195,3 +196,51 @@ async def pause_monitor(request: Request, monitor_id: int):
 async def resume_monitor(request: Request, monitor_id: int):
     out = await kcall("resumeMonitor", monitor_id, mutation=True)
     return ActionResult(msg=out.get("msg") if isinstance(out, dict) else None)
+
+
+# ---------------- tags ----------------
+@app.get("/v1/tags", dependencies=[Depends(require_api_key)], response_model=TagsOut)
+@limiter.limit(settings.RATE_LIMIT)
+async def list_tags(request: Request):
+    resp = await kcall("getTags")
+    return {"tags": resp.get("tags", []) if isinstance(resp, dict) else []}
+
+
+@app.post("/v1/tags", dependencies=[Depends(require_api_key)], response_model=TagOut)
+@limiter.limit(settings.RATE_LIMIT)
+async def create_tag(request: Request, body: TagCreate):
+    resp = await kcall("addTag", {"name": body.name, "color": body.color}, mutation=True)
+    return resp.get("tag") if isinstance(resp, dict) else resp
+
+
+async def _find_tag_by_name(name: str):
+    resp = await kcall("getTags")
+    for t in (resp.get("tags") or []) if isinstance(resp, dict) else []:
+        if t.get("name") == name:
+            return t
+    return None
+
+
+@app.post("/v1/monitors/{monitor_id}/tags", dependencies=[Depends(require_api_key)], response_model=ActionResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def add_monitor_tag(request: Request, monitor_id: int, body: MonitorTagIn):
+    tag_id = body.tag_id
+    if not tag_id:
+        if not body.name:
+            return JSONResponse(status_code=422, content={"detail": "tag_id or name required"})
+        tag = await _find_tag_by_name(body.name)
+        if not tag:
+            created = await kcall("addTag", {"name": body.name, "color": body.color}, mutation=True)
+            tag = created.get("tag") if isinstance(created, dict) else None
+        tag_id = tag.get("id") if tag else None
+        if not tag_id:
+            return JSONResponse(status_code=502, content={"detail": "could not resolve/create tag"})
+    await kcall("addMonitorTag", (tag_id, monitor_id, body.value or ""), mutation=True)
+    return ActionResult(msg="tag added")
+
+
+@app.delete("/v1/monitors/{monitor_id}/tags/{tag_id}", dependencies=[Depends(require_api_key)], response_model=ActionResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def remove_monitor_tag(request: Request, monitor_id: int, tag_id: int, value: str = ""):
+    await kcall("deleteMonitorTag", (tag_id, monitor_id, value), mutation=True)
+    return ActionResult(msg="tag removed")

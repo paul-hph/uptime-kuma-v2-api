@@ -68,6 +68,7 @@ class MonitorOut(BaseModel):
     interval: Optional[int] = None
     active: Optional[bool] = None
     maxretries: Optional[int] = None
+    tags: Optional[list[Any]] = None
 
     @classmethod
     def from_kuma(cls, m: dict) -> "MonitorOut":
@@ -81,6 +82,7 @@ class MonitorOut(BaseModel):
             interval=m.get("interval"),
             active=m.get("active"),
             maxretries=m.get("maxretries"),
+            tags=m.get("tags"),
         )
 
 
@@ -101,6 +103,29 @@ class Beat(BaseModel):
     ping: Optional[float] = None
     msg: Optional[str] = None
     important: Optional[bool] = None
+
+
+class TagOut(BaseModel):
+    id: int
+    name: str
+    color: Optional[str] = None
+
+
+class TagsOut(BaseModel):
+    tags: list[TagOut]
+
+
+class TagCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+    color: Optional[str] = Field("#4caf50", max_length=20)
+
+
+class MonitorTagIn(BaseModel):
+    """Attach a tag to a monitor: by tag_id, or by name (find-or-create)."""
+    tag_id: Optional[int] = None
+    name: Optional[str] = Field(None, max_length=100)
+    color: Optional[str] = Field("#4caf50", max_length=20)
+    value: Optional[str] = Field("", max_length=255)
 
 
 class MonitorListOut(BaseModel):
