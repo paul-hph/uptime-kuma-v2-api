@@ -68,6 +68,16 @@ class MonitorOut(BaseModel):
     interval: Optional[int] = None
     active: Optional[bool] = None
     maxretries: Optional[int] = None
+    method: Optional[str] = None
+    keyword: Optional[str] = None
+    description: Optional[str] = None
+    retryInterval: Optional[int] = None
+    resendInterval: Optional[int] = None
+    maxredirects: Optional[int] = None
+    accepted_statuscodes: Optional[list[Any]] = None
+    expiryNotification: Optional[bool] = None
+    ignoreTls: Optional[bool] = None
+    upsideDown: Optional[bool] = None
     tags: Optional[list[Any]] = None
 
     @classmethod
@@ -82,6 +92,16 @@ class MonitorOut(BaseModel):
             interval=m.get("interval"),
             active=m.get("active"),
             maxretries=m.get("maxretries"),
+            method=m.get("method"),
+            keyword=m.get("keyword"),
+            description=m.get("description"),
+            retryInterval=m.get("retryInterval"),
+            resendInterval=m.get("resendInterval"),
+            maxredirects=m.get("maxredirects"),
+            accepted_statuscodes=m.get("accepted_statuscodes"),
+            expiryNotification=m.get("expiryNotification"),
+            ignoreTls=m.get("ignoreTls"),
+            upsideDown=m.get("upsideDown"),
             tags=m.get("tags"),
         )
 
