@@ -5,6 +5,7 @@ import hashlib
 import logging
 import time
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
@@ -145,6 +146,44 @@ async def get_beats(request: Request, monitor_id: int, hours: int = Query(24, ge
     resp = await kcall("getMonitorBeats", (monitor_id, hours))
     data = resp.get("data") if isinstance(resp, dict) else resp
     return {"monitor_id": monitor_id, "hours": hours, "beats": data or []}
+
+
+@app.get("/v1/beats", dependencies=[Depends(require_api_key)])
+@limiter.limit(settings.RATE_LIMIT)
+async def get_beats_bulk(
+    request: Request,
+    ids: str = Query(..., description="Comma-separated monitor ids, e.g. 1,2,3"),
+    hours: int = Query(24, ge=1, le=720),
+    limit: int = Query(0, ge=0, le=1000, description="Keep only the last N beats per monitor (0 = all)"),
+):
+    """Fetch beats for many monitors in one request (one round-trip for the client).
+
+    Beats are fetched server-side per monitor (Kuma has no bulk API), but those
+    calls are local to Kuma — far cheaper than one remote HTTP round-trip each.
+    """
+    id_list: list[int] = []
+    for raw in ids.split(","):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            id_list.append(int(raw))
+        except ValueError:
+            continue
+    id_list = id_list[:200]  # bound the work per request
+
+    out: dict[int, Any] = {}
+    for mid in id_list:
+        try:
+            resp = await kcall("getMonitorBeats", (mid, hours))
+            data = resp.get("data") if isinstance(resp, dict) else resp
+            data = data or []
+            if limit and len(data) > limit:
+                data = data[-limit:]
+            out[mid] = data
+        except Exception:
+            out[mid] = None
+    return {"hours": hours, "beats": out}
 
 
 # ---------------- mutations ----------------

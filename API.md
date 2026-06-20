@@ -82,6 +82,22 @@ Query: `?stale_ok=true` to allow a stale cache while disconnected (default `fals
 ```
 `status`: 0=down, 1=up, 2=pending, 3=maintenance. `beats` are Kuma heartbeat objects.
 
+### `GET /v1/beats?ids=1,2,3&hours=24&limit=50` — heartbeats for many monitors (bulk)
+One round-trip for a whole page of monitors. `ids`: comma-separated (max 200). `limit`: keep only the
+last N beats per monitor (0 = all). Beats are fetched server-side (local to Kuma), so this is far cheaper
+than one remote request per monitor.
+```json
+{
+  "hours": 24,
+  "beats": {
+    "1": [ { "status": 1, "time": "…", "ping": 134, "msg": "200 - OK" } ],
+    "2": [ … ],
+    "7": null
+  }
+}
+```
+A monitor maps to `null` if its beats could not be fetched.
+
 ### `POST /v1/monitors` — create
 Supported `type`: `http`, `ping`, `tcp`, `keyword`. Only `type` + `name` are required;
 type-specific and common fields are optional (sensible defaults applied, incl. `conditions: []`).
