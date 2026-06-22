@@ -30,6 +30,8 @@ class MonitorCreate(BaseModel):
     maxretries: Optional[int] = Field(None, ge=0, le=100)
     upsideDown: Optional[bool] = None
     description: Optional[str] = Field(None, max_length=2000)
+    # id of a "group"-type monitor to nest this monitor under (monitor group)
+    parent: Optional[int] = Field(None, ge=1)
 
     def validate_type(self) -> str:
         if self.type not in SUPPORTED_TYPES:
@@ -79,6 +81,7 @@ class MonitorOut(BaseModel):
     ignoreTls: Optional[bool] = None
     upsideDown: Optional[bool] = None
     tags: Optional[list[Any]] = None
+    parent: Optional[int] = None
 
     @classmethod
     def from_kuma(cls, m: dict) -> "MonitorOut":
@@ -103,6 +106,7 @@ class MonitorOut(BaseModel):
             ignoreTls=m.get("ignoreTls"),
             upsideDown=m.get("upsideDown"),
             tags=m.get("tags"),
+            parent=m.get("parent"),
         )
 
 
@@ -162,3 +166,17 @@ class BeatsOut(BaseModel):
 class HealthOut(BaseModel):
     status: str
     detail: Any = None
+
+
+class StatusPageMonitorsIn(BaseModel):
+    """Add monitors to a status page, into a named public group (created if missing)."""
+    monitor_ids: list[int] = Field(min_length=1, max_length=500)
+    group: str = Field("Dienste", min_length=1, max_length=150)
+
+
+class StatusPageMonitorsResult(BaseModel):
+    ok: bool = True
+    slug: str
+    group: str
+    added: list[int]
+    skipped: list[int]

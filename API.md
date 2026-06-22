@@ -117,9 +117,11 @@ type-specific and common fields are optional (sensible defaults applied, incl. `
   "accepted_statuscodes": ["200-299"],
   "ignoreTls": false,
   "upsideDown": false,
-  "description": "optional"
+  "description": "optional",
+  "parent": 1283
 }
 ```
+`parent` (optional): id of a `group`-type monitor to nest this monitor under (monitor group).
 **Request (ping):** `{ "type": "ping", "name": "GW", "hostname": "1.1.1.1" }`
 **Request (tcp):**  `{ "type": "tcp", "name": "DNS", "hostname": "1.1.1.1", "port": 53 }`
 **Request (keyword):** `{ "type": "keyword", "name": "KW", "url": "https://a.b", "keyword": "ok" }`
@@ -168,6 +170,31 @@ By id **or** by name (find-or-create):
 
 ### `DELETE /v1/monitors/{id}/tags/{tag_id}?value=` — detach a tag
 **Response `200`:** `{ "ok": true, "msg": "tag removed" }`.
+
+---
+
+## Status pages
+
+### `GET /v1/statuspages/{slug}` — config + public group list
+```json
+{
+  "config": { "slug": "helden", "title": "Helden Apps", "domainNameList": [], "...": "…" },
+  "publicGroupList": [
+    { "id": 2, "name": "Dienste", "weight": 1, "monitorList": [ { "id": 1276, "name": "…" } ] }
+  ]
+}
+```
+
+### `POST /v1/statuspages/{slug}/monitors` — add monitors to a public group
+Fetch-merge-save: the named `group` is created if missing; existing groups/monitors are
+preserved; monitors already on the page are skipped. `group` defaults to `"Dienste"`.
+```json
+{ "monitor_ids": [1310, 1311, 1312], "group": "Intern" }
+```
+**Response `200`:**
+```json
+{ "ok": true, "slug": "helden", "group": "Intern", "added": [1310, 1311], "skipped": [1312] }
+```
 
 ---
 

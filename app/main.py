@@ -2,8 +2,10 @@
 import asyncio
 import functools
 import hashlib
+import json
 import logging
 import time
+import urllib.request
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -23,7 +25,7 @@ from .kuma_client import (
 from .monitors import defaults
 from .monitors.schemas import (
     ActionResult, BeatsOut, CreateResult, MonitorCreate, MonitorListOut, MonitorOut, MonitorPatch,
-    MonitorTagIn, TagCreate, TagOut, TagsOut,
+    MonitorTagIn, StatusPageMonitorsIn, StatusPageMonitorsResult, TagCreate, TagOut, TagsOut,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -86,6 +88,19 @@ async def kcall(event, data=None, *, mutation=False):
         return await run_in_threadpool(functools.partial(client.call, event, data, mutation=mutation))
     finally:
         _sem.release()
+
+
+def _kuma_public_status_page(slug: str, timeout: int = 15) -> dict:
+    """Fetch a status page's public payload (incl. publicGroupList) from Kuma's REST API.
+
+    The socket `getStatusPage` event returns only `config` (no group list), so the
+    current group/monitor layout has to come from Kuma's own `/api/status-page/<slug>`.
+    KUMA_SERVER is a trusted, operator-configured internal URL.
+    """
+    url = f"{settings.KUMA_SERVER.rstrip('/')}/api/status-page/{slug}"
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 (trusted internal URL)
+        return json.loads(r.read().decode("utf-8"))
 
 
 async def fetch_monitor(monitor_id: int):
@@ -283,3 +298,65 @@ async def add_monitor_tag(request: Request, monitor_id: int, body: MonitorTagIn)
 async def remove_monitor_tag(request: Request, monitor_id: int, tag_id: int, value: str = ""):
     await kcall("deleteMonitorTag", (tag_id, monitor_id, value), mutation=True)
     return ActionResult(msg="tag removed")
+
+
+# ---------------- status pages ----------------
+async def _status_page_config(slug: str) -> dict | None:
+    """Full editable config (Kuma's toJSON: incl. domainNameList) for a status page."""
+    resp = await kcall("getStatusPage", slug)
+    return resp.get("config") if isinstance(resp, dict) else None
+
+
+@app.get("/v1/statuspages/{slug}", dependencies=[Depends(require_api_key)])
+@limiter.limit(settings.RATE_LIMIT)
+async def get_status_page(request: Request, slug: str):
+    config = await _status_page_config(slug)
+    if not config:
+        return JSONResponse(status_code=404, content={"detail": "status page not found"})
+    try:
+        public = await run_in_threadpool(_kuma_public_status_page, slug)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(status_code=502, content={"detail": f"could not read status page groups: {e}"})
+    return {"config": config, "publicGroupList": public.get("publicGroupList", [])}
+
+
+@app.post("/v1/statuspages/{slug}/monitors", dependencies=[Depends(require_api_key)],
+          response_model=StatusPageMonitorsResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def add_status_page_monitors(request: Request, slug: str, body: StatusPageMonitorsIn):
+    """Add monitors to a status page's public group (group created if it doesn't exist).
+
+    Fetch-merge-save: existing groups/monitors are preserved; monitors already on the
+    page are skipped. Kuma rebuilds the whole page from the payload, so the full,
+    current group list must be sent back — which is exactly what we merge into.
+    """
+    config = await _status_page_config(slug)
+    if not config:
+        return JSONResponse(status_code=404, content={"detail": "status page not found"})
+    try:
+        public = await run_in_threadpool(_kuma_public_status_page, slug)
+    except Exception as e:  # noqa: BLE001
+        return JSONResponse(status_code=502, content={"detail": f"could not read status page groups: {e}"})
+
+    groups: list[dict[str, Any]] = list(public.get("publicGroupList") or [])
+    existing_ids = {m.get("id") for g in groups for m in (g.get("monitorList") or [])}
+
+    target = next((g for g in groups if g.get("name") == body.group), None)
+    if target is None:
+        target = {"name": body.group, "weight": len(groups) + 1, "monitorList": []}
+        groups.append(target)
+    target.setdefault("monitorList", [])
+
+    added: list[int] = []
+    skipped: list[int] = []
+    for mid in body.monitor_ids:
+        if mid in existing_ids:
+            skipped.append(mid)
+            continue
+        target["monitorList"].append({"id": mid})
+        existing_ids.add(mid)
+        added.append(mid)
+
+    img = config.get("icon") or ""
+    await kcall("saveStatusPage", (slug, config, img, groups), mutation=True)
+    return StatusPageMonitorsResult(slug=slug, group=body.group, added=added, skipped=skipped)
