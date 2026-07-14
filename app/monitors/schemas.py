@@ -262,3 +262,10 @@ class MaintenanceCreateResult(BaseModel):
 class MaintenanceMonitorsIn(BaseModel):
     """Replace the monitor set assigned to a maintenance window."""
     monitor_ids: list[int] = Field(min_length=1, max_length=2000)
+
+
+class SettingsIn(BaseModel):
+    """Save Kuma general settings. Kuma REPLACES the whole 'general' group, so `settings`
+    must be the full object (fetch GET /v1/settings, merge your change, send it all back)."""
+    settings: dict
+    currentPassword: str = ""

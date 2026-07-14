@@ -4,6 +4,7 @@ from pydantic import ValidationError
 from app.monitors.schemas import (
     MonitorCreate, MonitorPatch, MonitorOut, StatusPageMonitorsIn, StatusPageCreate,
     NotificationCreate, MonitorNotificationIn, MaintenanceCreate, MaintenanceMonitorsIn,
+    SettingsIn,
 )
 from app.monitors import defaults
 
@@ -115,3 +116,9 @@ def test_maintenance_monitors_in_requires_ids():
     assert MaintenanceMonitorsIn(monitor_ids=[1, 2]).monitor_ids == [1, 2]
     with pytest.raises(ValidationError):
         MaintenanceMonitorsIn(monitor_ids=[])
+
+
+def test_settings_in_defaults():
+    s = SettingsIn(settings={"serverTimezone": "Europe/Berlin"})
+    assert s.currentPassword == ""
+    assert s.settings["serverTimezone"] == "Europe/Berlin"

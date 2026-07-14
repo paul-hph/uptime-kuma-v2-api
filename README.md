@@ -68,6 +68,7 @@ docker run -d -p 127.0.0.1:8000:8000 \
 | POST | `/v1/monitors/{id}/notifications` | attach/detach a notification to a monitor |
 | POST | `/v1/maintenances` | create a maintenance window (suppresses alerts) |
 | POST | `/v1/maintenances/{id}/monitors` | set monitors assigned to a window |
+| GET · POST | `/v1/settings` | read / save Kuma general settings (e.g. `serverTimezone`) |
 | POST | `/v1/statuspages` | create/update a status page |
 | GET | `/v1/statuspages/{slug}` | config + public group list |
 | POST | `/v1/statuspages/{slug}/monitors` | add monitors to a public group |

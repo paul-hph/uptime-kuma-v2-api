@@ -202,6 +202,21 @@ Fetch-merge-edit: preserves any other notifications already on the monitor.
 
 ---
 
+## Settings
+
+### `GET /v1/settings` — Kuma general settings
+Returns the general settings object (`serverTimezone`, `primaryBaseURL`, `entryPage`, …).
+
+### `POST /v1/settings` — save general settings
+Kuma **replaces** the whole general group, so send the full object: GET first, change what you
+need, POST it all back. Setting `serverTimezone` is applied live.
+```json
+{ "settings": { "serverTimezone": "Europe/Berlin", "entryPage": "dashboard", "...": "…" } }
+```
+**Response `200`:** `{ "ok": true, "msg": "settings saved" }`
+
+---
+
 ## Maintenance
 
 ### `POST /v1/maintenances` — create a maintenance window

@@ -27,8 +27,8 @@ from .monitors.schemas import (
     ActionResult, BeatsOut, CreateResult, MaintenanceCreate, MaintenanceCreateResult,
     MaintenanceMonitorsIn, MonitorCreate, MonitorListOut, MonitorNotificationIn,
     MonitorOut, MonitorPatch, MonitorTagIn, NotificationCreate, NotificationCreateResult,
-    StatusPageCreate, StatusPageCreateResult, StatusPageMonitorsIn, StatusPageMonitorsResult,
-    TagCreate, TagOut, TagsOut,
+    SettingsIn, StatusPageCreate, StatusPageCreateResult, StatusPageMonitorsIn,
+    StatusPageMonitorsResult, TagCreate, TagOut, TagsOut,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -351,6 +351,24 @@ async def set_monitor_notification(request: Request, monitor_id: int, body: Moni
         merged["conditions"] = []
     out = await kcall("editMonitor", merged, mutation=True)
     return ActionResult(msg=out.get("msg") if isinstance(out, dict) else None)
+
+
+# ---------------- settings ----------------
+@app.get("/v1/settings", dependencies=[Depends(require_api_key)])
+@limiter.limit(settings.RATE_LIMIT)
+async def get_kuma_settings(request: Request):
+    """Kuma general settings (serverTimezone, primaryBaseURL, entryPage, …)."""
+    resp = await kcall("getSettings")
+    return resp.get("data") if isinstance(resp, dict) else resp
+
+
+@app.post("/v1/settings", dependencies=[Depends(require_api_key)], response_model=ActionResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def save_kuma_settings(request: Request, body: SettingsIn):
+    """Save Kuma general settings. Kuma replaces the whole group, so send the full object
+    (GET first, merge, POST back). Setting `serverTimezone` is applied live."""
+    await kcall("setSettings", (body.settings, body.currentPassword), mutation=True)
+    return ActionResult(msg="settings saved")
 
 
 # ---------------- maintenance ----------------
