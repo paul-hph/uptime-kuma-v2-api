@@ -176,6 +176,30 @@ By id **or** by name (find-or-create):
 
 ---
 
+## Notifications
+
+### `POST /v1/notifications` — create a notification provider
+Provider-specific fields go in `config` and are merged flat into the object Kuma stores.
+Set `applyExisting: true` to attach it to every existing monitor at once; otherwise assign it
+per monitor (below).
+```json
+{
+  "name": "RC #hosting-info",
+  "type": "rocket.chat",
+  "config": { "rocketchatwebhookURL": "https://chat.example/hooks/aaa/bbb" }
+}
+```
+**Response `200`:** `{ "ok": true, "id": 12, "msg": "Saved." }`
+
+### `POST /v1/monitors/{id}/notifications` — attach/detach a notification to a monitor
+Fetch-merge-edit: preserves any other notifications already on the monitor.
+```json
+{ "notification_id": 12, "enabled": true }
+```
+**Response `200`:** `{ "ok": true, "msg": "Edited Successfully." }` · `enabled: false` detaches.
+
+---
+
 ## Status pages
 
 ### `POST /v1/statuspages` — create (or update) a status page

@@ -24,9 +24,10 @@ from .kuma_client import (
 )
 from .monitors import defaults
 from .monitors.schemas import (
-    ActionResult, BeatsOut, CreateResult, MonitorCreate, MonitorListOut, MonitorOut, MonitorPatch,
-    MonitorTagIn, StatusPageCreate, StatusPageCreateResult, StatusPageMonitorsIn,
-    StatusPageMonitorsResult, TagCreate, TagOut, TagsOut,
+    ActionResult, BeatsOut, CreateResult, MonitorCreate, MonitorListOut, MonitorNotificationIn,
+    MonitorOut, MonitorPatch, MonitorTagIn, NotificationCreate, NotificationCreateResult,
+    StatusPageCreate, StatusPageCreateResult, StatusPageMonitorsIn, StatusPageMonitorsResult,
+    TagCreate, TagOut, TagsOut,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -299,6 +300,54 @@ async def add_monitor_tag(request: Request, monitor_id: int, body: MonitorTagIn)
 async def remove_monitor_tag(request: Request, monitor_id: int, tag_id: int, value: str = ""):
     await kcall("deleteMonitorTag", (tag_id, monitor_id, value), mutation=True)
     return ActionResult(msg="tag removed")
+
+
+# ---------------- notifications ----------------
+@app.post("/v1/notifications", dependencies=[Depends(require_api_key)],
+          response_model=NotificationCreateResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def create_notification(request: Request, body: NotificationCreate):
+    """Create a notification provider (e.g. Rocket.Chat webhook).
+
+    Provider-specific keys go in `config` and are merged flat into the object Kuma stores
+    (that's how Kuma's notification model reads them, e.g. `rocketchatwebhookURL`).
+    Assign it to monitors with `POST /v1/monitors/{id}/notifications` — or set
+    `applyExisting: true` to attach it to every existing monitor at once.
+    """
+    payload = {
+        "name": body.name,
+        "type": body.type,
+        "isDefault": body.isDefault,
+        "applyExisting": body.applyExisting,
+        **body.config,
+    }
+    # addNotification(notification, notificationID): null id => create
+    resp = await kcall("addNotification", (payload, None), mutation=True)
+    nid = resp.get("id") if isinstance(resp, dict) else None
+    return NotificationCreateResult(id=nid, msg=resp.get("msg") if isinstance(resp, dict) else None)
+
+
+@app.post("/v1/monitors/{monitor_id}/notifications", dependencies=[Depends(require_api_key)],
+          response_model=ActionResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def set_monitor_notification(request: Request, monitor_id: int, body: MonitorNotificationIn):
+    """Attach/detach one notification to a monitor (fetch-merge-edit, preserves others)."""
+    current = await fetch_monitor(monitor_id)
+    if not current:
+        return JSONResponse(status_code=404, content={"detail": "monitor not found"})
+    merged = defaults.strip_server_owned(current)
+    merged["id"] = monitor_id
+    nlist = dict(merged.get("notificationIDList") or {})
+    key = str(body.notification_id)
+    if body.enabled:
+        nlist[key] = True
+    else:
+        nlist.pop(key, None)
+    merged["notificationIDList"] = nlist
+    if merged.get("conditions") is None:
+        merged["conditions"] = []
+    out = await kcall("editMonitor", merged, mutation=True)
+    return ActionResult(msg=out.get("msg") if isinstance(out, dict) else None)
 
 
 # ---------------- status pages ----------------

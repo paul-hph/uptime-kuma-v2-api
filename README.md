@@ -24,7 +24,8 @@ thin, robust FastAPI wrapper built specifically for **Kuma 2.x**.
 ## Features
 - Full monitor CRUD: list, get, create, edit, delete, pause, resume, heartbeats.
 - Monitor **groups** (`type: group`) and nesting via `parent` (on create or `PATCH`).
-- **Tags** (create, attach, detach) and **status pages** (create/update, add monitors to public groups).
+- **Tags** (create, attach, detach), **notifications** (create providers, attach per monitor),
+  and **status pages** (create/update, add monitors to public groups).
 - One **persistent authenticated** Socket.IO connection (fast, no per-request login).
 - API-key auth (constant-time, multiple keys), rate limiting, stable JSON schemas.
 - Solves the `conditions` create bug via complete per-type payloads.
@@ -62,6 +63,8 @@ docker run -d -p 127.0.0.1:8000:8000 \
 | POST | `/v1/monitors/{id}/pause` · `/resume` | pause/resume |
 | GET | `/v1/tags` · POST `/v1/tags` | list / create tags |
 | POST | `/v1/monitors/{id}/tags` · DELETE `.../{tag_id}` | attach / detach a tag |
+| POST | `/v1/notifications` | create a notification provider (e.g. Rocket.Chat) |
+| POST | `/v1/monitors/{id}/notifications` | attach/detach a notification to a monitor |
 | POST | `/v1/statuspages` | create/update a status page |
 | GET | `/v1/statuspages/{slug}` | config + public group list |
 | POST | `/v1/statuspages/{slug}/monitors` | add monitors to a public group |

@@ -197,3 +197,29 @@ class StatusPageCreateResult(BaseModel):
     title: str
     published: bool
     created: bool  # False when the slug already existed and was updated in place
+
+
+class NotificationCreate(BaseModel):
+    """Create a notification provider. `config` carries provider-specific fields.
+
+    Example (Rocket.Chat):
+        { "name": "RC #hosting-info", "type": "rocket.chat",
+          "config": { "rocketchatwebhookURL": "https://chat.example/hooks/…" } }
+    """
+    name: str = Field(min_length=1, max_length=150)
+    type: str = Field(min_length=1, max_length=50)
+    config: dict = Field(default_factory=dict)
+    isDefault: bool = False
+    applyExisting: bool = False
+
+
+class NotificationCreateResult(BaseModel):
+    ok: bool = True
+    id: Optional[int] = None
+    msg: Optional[str] = None
+
+
+class MonitorNotificationIn(BaseModel):
+    """Attach (or detach) a notification to a single monitor."""
+    notification_id: int = Field(ge=1)
+    enabled: bool = True

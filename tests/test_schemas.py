@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from app.monitors.schemas import (
     MonitorCreate, MonitorPatch, MonitorOut, StatusPageMonitorsIn, StatusPageCreate,
+    NotificationCreate, MonitorNotificationIn,
 )
 from app.monitors import defaults
 
@@ -76,3 +77,17 @@ def test_status_page_create_defaults_and_slug_validation():
     assert sp.published is True
     with pytest.raises(ValidationError):
         StatusPageCreate(slug="Not Valid Slug!", title="x")  # pattern rejects spaces/caps/!
+
+
+def test_notification_create_defaults_and_config_passthrough():
+    n = NotificationCreate(name="RC", type="rocket.chat",
+                           config={"rocketchatwebhookURL": "https://c/hooks/a/b"})
+    assert n.isDefault is False and n.applyExisting is False
+    assert n.config["rocketchatwebhookURL"] == "https://c/hooks/a/b"
+
+
+def test_monitor_notification_in_requires_positive_id():
+    mn = MonitorNotificationIn(notification_id=3)
+    assert mn.enabled is True
+    with pytest.raises(ValidationError):
+        MonitorNotificationIn(notification_id=0)  # ge=1
