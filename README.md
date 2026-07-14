@@ -23,6 +23,8 @@ thin, robust FastAPI wrapper built specifically for **Kuma 2.x**.
 
 ## Features
 - Full monitor CRUD: list, get, create, edit, delete, pause, resume, heartbeats.
+- Monitor **groups** (`type: group`) and nesting via `parent` (on create or `PATCH`).
+- **Tags** (create, attach, detach) and **status pages** (create/update, add monitors to public groups).
 - One **persistent authenticated** Socket.IO connection (fast, no per-request login).
 - API-key auth (constant-time, multiple keys), rate limiting, stable JSON schemas.
 - Solves the `conditions` create bug via complete per-type payloads.
@@ -54,12 +56,17 @@ docker run -d -p 127.0.0.1:8000:8000 \
 | GET | `/v1/monitors` | list (cached snapshot, `X-Kuma-Cache-Age` header) |
 | GET | `/v1/monitors/{id}` | single monitor |
 | GET | `/v1/monitors/{id}/beats?hours=24` | heartbeats |
-| POST | `/v1/monitors` | create (`http`, `ping`, `tcp`, `keyword`) |
-| PATCH | `/v1/monitors/{id}` | edit (fetch-merge-edit) |
+| POST | `/v1/monitors` | create (`http`, `ping`, `tcp`, `keyword`, `group`) |
+| PATCH | `/v1/monitors/{id}` | edit (fetch-merge-edit; `parent` moves into a group) |
 | DELETE | `/v1/monitors/{id}` | delete |
 | POST | `/v1/monitors/{id}/pause` · `/resume` | pause/resume |
+| GET | `/v1/tags` · POST `/v1/tags` | list / create tags |
+| POST | `/v1/monitors/{id}/tags` · DELETE `.../{tag_id}` | attach / detach a tag |
+| POST | `/v1/statuspages` | create/update a status page |
+| GET | `/v1/statuspages/{slug}` | config + public group list |
+| POST | `/v1/statuspages/{slug}/monitors` | add monitors to a public group |
 
-All `/v1` endpoints require the `X-API-Key` header.
+All `/v1` endpoints require the `X-API-Key` header. Full reference: [API.md](API.md).
 
 ```bash
 curl -H "X-API-Key: $KEY" -X POST http://localhost:8000/v1/monitors \
