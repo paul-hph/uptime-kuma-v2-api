@@ -99,8 +99,10 @@ than one remote request per monitor.
 A monitor maps to `null` if its beats could not be fetched.
 
 ### `POST /v1/monitors` — create
-Supported `type`: `http`, `ping`, `tcp`, `keyword`. Only `type` + `name` are required;
+Supported `type`: `http`, `ping`, `tcp`, `keyword`, `group`. Only `type` + `name` are required;
 type-specific and common fields are optional (sensible defaults applied, incl. `conditions: []`).
+A `group` is a container monitor with no probe of its own — create one (`{ "type": "group",
+"name": "Care-Kunden" }`), then nest monitors under it by passing its id as `parent`.
 
 **Request (http):**
 ```json
@@ -138,6 +140,7 @@ type-specific and common fields are optional (sensible defaults applied, incl. `
 ### `PATCH /v1/monitors/{id}` — edit (fetch-merge-edit)
 Send only the fields you want to change (same names/bounds as create).
 **Request:** `{ "name": "Renamed", "interval": 120 }`
+Pass `parent` to move a monitor into a monitor group: `{ "parent": 1400 }`.
 **Response `200`:** `{ "ok": true, "msg": "Edited Successfully." }` · `404` if not found.
 
 ### `DELETE /v1/monitors/{id}`
@@ -174,6 +177,19 @@ By id **or** by name (find-or-create):
 ---
 
 ## Status pages
+
+### `POST /v1/statuspages` — create (or update) a status page
+Idempotent: a new `slug` is created via Kuma's `addStatusPage`, then `title`/`published` are set;
+an existing `slug` is updated in place (title/published), preserving all other config and its
+public group list. `published` defaults to `true`. `slug` must match `^[a-z0-9._-]+$`.
+```json
+{ "slug": "care", "title": "Helden Care", "published": true }
+```
+**Response `200`:**
+```json
+{ "ok": true, "slug": "care", "title": "Helden Care", "published": true, "created": true }
+```
+`created` is `false` when the slug already existed and was updated.
 
 ### `GET /v1/statuspages/{slug}` — config + public group list
 ```json

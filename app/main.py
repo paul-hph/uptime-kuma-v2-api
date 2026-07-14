@@ -25,7 +25,8 @@ from .kuma_client import (
 from .monitors import defaults
 from .monitors.schemas import (
     ActionResult, BeatsOut, CreateResult, MonitorCreate, MonitorListOut, MonitorOut, MonitorPatch,
-    MonitorTagIn, StatusPageMonitorsIn, StatusPageMonitorsResult, TagCreate, TagOut, TagsOut,
+    MonitorTagIn, StatusPageCreate, StatusPageCreateResult, StatusPageMonitorsIn,
+    StatusPageMonitorsResult, TagCreate, TagOut, TagsOut,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -305,6 +306,41 @@ async def _status_page_config(slug: str) -> dict | None:
     """Full editable config (Kuma's toJSON: incl. domainNameList) for a status page."""
     resp = await kcall("getStatusPage", slug)
     return resp.get("config") if isinstance(resp, dict) else None
+
+
+@app.post("/v1/statuspages", dependencies=[Depends(require_api_key)],
+          response_model=StatusPageCreateResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def create_status_page(request: Request, body: StatusPageCreate):
+    """Create a status page (or update title/published if the slug already exists).
+
+    Kuma's `addStatusPage` only creates a bare page; title & published are then set via
+    `saveStatusPage`, preserving every other config key (theme, css, domainNameList, …)
+    and the existing public group list.
+    """
+    try:
+        existing = await _status_page_config(body.slug)
+    except KumaError:
+        existing = None
+    created = False
+    if not existing:
+        await kcall("addStatusPage", (body.title, body.slug), mutation=True)
+        created = True
+
+    config = await _status_page_config(body.slug)
+    if not config:
+        return JSONResponse(status_code=502, content={"detail": "status page not readable after create"})
+    config["title"] = body.title
+    config["published"] = body.published
+    try:
+        public = await run_in_threadpool(_kuma_public_status_page, body.slug)
+        groups = public.get("publicGroupList") or []
+    except Exception:  # noqa: BLE001 (fresh page may have no public endpoint yet)
+        groups = []
+    img = config.get("icon") or ""
+    await kcall("saveStatusPage", (body.slug, config, img, groups), mutation=True)
+    return StatusPageCreateResult(slug=body.slug, title=body.title,
+                                  published=body.published, created=created)
 
 
 @app.get("/v1/statuspages/{slug}", dependencies=[Depends(require_api_key)])

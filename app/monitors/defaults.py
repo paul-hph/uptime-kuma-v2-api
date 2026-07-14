@@ -5,7 +5,7 @@ older clients (NOT NULL in 2.2.x). Server-owned fields are never sent on create.
 For other Kuma versions these need matrix verification (see tests/fixtures).
 """
 
-SUPPORTED_TYPES = ("http", "ping", "tcp", "keyword")
+SUPPORTED_TYPES = ("http", "ping", "tcp", "keyword", "group")
 
 # Fields Kuma owns/sets itself; strip before `add`.
 SERVER_OWNED = {
@@ -66,6 +66,10 @@ _BY_TYPE = {
         "body": None,
         "authMethod": None,
         "httpBodyEncoding": "json",
+    },
+    # A "group" is a container monitor (no probe of its own); children reference it via `parent`.
+    "group": {
+        "type": "group",
     },
 }
 

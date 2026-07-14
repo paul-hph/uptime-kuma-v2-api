@@ -55,6 +55,8 @@ class MonitorPatch(BaseModel):
     upsideDown: Optional[bool] = None
     accepted_statuscodes: Optional[list[StatusCode]] = Field(None, max_length=50)
     description: Optional[str] = Field(None, max_length=2000)
+    # id of a "group"-type monitor to move this monitor under (monitor group)
+    parent: Optional[int] = Field(None, ge=1)
 
     def changed(self) -> dict:
         return {k: v for k, v in self.model_dump().items() if v is not None}
@@ -180,3 +182,18 @@ class StatusPageMonitorsResult(BaseModel):
     group: str
     added: list[int]
     skipped: list[int]
+
+
+class StatusPageCreate(BaseModel):
+    """Create (or update) a status page. Idempotent: an existing slug is updated, not duplicated."""
+    slug: str = Field(min_length=1, max_length=100, pattern=r"^[a-z0-9._-]+$")
+    title: str = Field(min_length=1, max_length=150)
+    published: bool = True
+
+
+class StatusPageCreateResult(BaseModel):
+    ok: bool = True
+    slug: str
+    title: str
+    published: bool
+    created: bool  # False when the slug already existed and was updated in place

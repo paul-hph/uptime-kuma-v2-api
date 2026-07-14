@@ -2,7 +2,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.monitors.schemas import (
-    MonitorCreate, MonitorPatch, MonitorOut, StatusPageMonitorsIn,
+    MonitorCreate, MonitorPatch, MonitorOut, StatusPageMonitorsIn, StatusPageCreate,
 )
 from app.monitors import defaults
 
@@ -54,3 +54,25 @@ def test_status_page_monitors_in_defaults_and_validation():
     assert spec.monitor_ids == [1, 2, 3]
     with pytest.raises(ValidationError):
         StatusPageMonitorsIn(monitor_ids=[])  # min_length=1
+
+
+def test_patch_parent_flows_into_changed():
+    p = MonitorPatch(parent=1400)
+    assert p.changed() == {"parent": 1400}
+
+
+def test_group_type_builds_container_payload():
+    body = MonitorCreate(type="group", name="Care-Kunden")
+    assert body.validate_type() == "group"
+    fields = {k: v for k, v in body.model_dump().items() if k != "type"}
+    payload = defaults.build_payload("group", fields)
+    assert payload["type"] == "group"
+    assert payload["name"] == "Care-Kunden"
+    assert payload["conditions"] == []  # the field that breaks older clients if missing
+
+
+def test_status_page_create_defaults_and_slug_validation():
+    sp = StatusPageCreate(slug="care", title="Helden Care")
+    assert sp.published is True
+    with pytest.raises(ValidationError):
+        StatusPageCreate(slug="Not Valid Slug!", title="x")  # pattern rejects spaces/caps/!
