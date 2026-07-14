@@ -178,15 +178,17 @@ By id **or** by name (find-or-create):
 
 ## Notifications
 
-### `POST /v1/notifications` — create a notification provider
-Provider-specific fields go in `config` and are merged flat into the object Kuma stores.
-Set `applyExisting: true` to attach it to every existing monitor at once; otherwise assign it
-per monitor (below).
+### `POST /v1/notifications` — create (or update) a notification provider
+Provider-specific fields go in `config` and are merged flat into the object Kuma stores — so
+use Kuma's exact field names. For Rocket.Chat the webhook field is **`rocketwebhookURL`**
+(not `rocketchatwebhookURL`). Pass `id` to update an existing notification in place (keeps its
+monitor assignments). Set `applyExisting: true` to attach it to every existing monitor at once;
+otherwise assign per monitor (below).
 ```json
 {
-  "name": "RC #hosting-info",
+  "name": "RC #support",
   "type": "rocket.chat",
-  "config": { "rocketchatwebhookURL": "https://chat.example/hooks/aaa/bbb" }
+  "config": { "rocketwebhookURL": "https://chat.example/hooks/aaa/bbb" }
 }
 ```
 **Response `200`:** `{ "ok": true, "id": 12, "msg": "Saved." }`
@@ -197,6 +199,33 @@ Fetch-merge-edit: preserves any other notifications already on the monitor.
 { "notification_id": 12, "enabled": true }
 ```
 **Response `200`:** `{ "ok": true, "msg": "Edited Successfully." }` · `enabled: false` detaches.
+
+---
+
+## Maintenance
+
+### `POST /v1/maintenances` — create a maintenance window
+While a window is active, Kuma **suppresses notifications** for the assigned monitors. The default
+strategy is `recurring-interval` (daily); `timeRange` is `[start, end]` and may cross midnight
+(e.g. 23:00–03:00 → Kuma treats it as a 4h window). Assign monitors with the endpoint below.
+```json
+{
+  "title": "Mittwald Nachtwartung",
+  "strategy": "recurring-interval",
+  "intervalDay": 1,
+  "timeRange": [ { "hours": 23, "minutes": 0 }, { "hours": 3, "minutes": 0 } ],
+  "timezoneOption": "Europe/Berlin",
+  "active": true
+}
+```
+**Response `200`:** `{ "ok": true, "id": 4, "msg": "Added Successfully." }`
+
+### `POST /v1/maintenances/{id}/monitors` — set assigned monitors
+Replaces the whole monitor set for the window.
+```json
+{ "monitor_ids": [290, 317, 332] }
+```
+**Response `200`:** `{ "ok": true, "msg": "Added Successfully." }`
 
 ---
 

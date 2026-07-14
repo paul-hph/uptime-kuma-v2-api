@@ -200,12 +200,14 @@ class StatusPageCreateResult(BaseModel):
 
 
 class NotificationCreate(BaseModel):
-    """Create a notification provider. `config` carries provider-specific fields.
+    """Create (or update) a notification provider. `config` carries provider-specific fields.
 
-    Example (Rocket.Chat):
-        { "name": "RC #hosting-info", "type": "rocket.chat",
-          "config": { "rocketchatwebhookURL": "https://chat.example/hooks/…" } }
+    Pass `id` to update an existing notification in place (keeps monitor assignments).
+    Example (Rocket.Chat — note the field name is `rocketwebhookURL`):
+        { "name": "RC #support", "type": "rocket.chat",
+          "config": { "rocketwebhookURL": "https://chat.example/hooks/…" } }
     """
+    id: Optional[int] = Field(None, ge=1)
     name: str = Field(min_length=1, max_length=150)
     type: str = Field(min_length=1, max_length=50)
     config: dict = Field(default_factory=dict)
@@ -223,3 +225,40 @@ class MonitorNotificationIn(BaseModel):
     """Attach (or detach) a notification to a single monitor."""
     notification_id: int = Field(ge=1)
     enabled: bool = True
+
+
+class TimeObj(BaseModel):
+    hours: int = Field(ge=0, le=23)
+    minutes: int = Field(ge=0, le=59)
+
+
+class MaintenanceCreate(BaseModel):
+    """Create a maintenance window (suppresses notifications for assigned monitors while active).
+
+    Default is a daily recurring window; `timeRange` is [start, end] and may cross midnight
+    (e.g. 23:00–03:00). Assign monitors afterwards via `POST /v1/maintenances/{id}/monitors`.
+    """
+    title: str = Field(min_length=1, max_length=150)
+    description: str = ""
+    strategy: str = Field("recurring-interval", max_length=40)
+    intervalDay: int = Field(1, ge=1, le=365)
+    timeRange: list[TimeObj] = Field(min_length=2, max_length=2)
+    weekdays: list[int] = Field(default_factory=list)
+    daysOfMonth: list[int] = Field(default_factory=list)
+    timezoneOption: str = Field("Europe/Berlin", max_length=64)
+    active: bool = True
+    # bounded date range; [null, null] = unbounded recurring
+    dateRange: list[Optional[str]] = Field(default_factory=lambda: [None, None])
+    cron: Optional[str] = Field(None, max_length=120)
+    durationMinutes: Optional[int] = Field(None, ge=1, le=1440)
+
+
+class MaintenanceCreateResult(BaseModel):
+    ok: bool = True
+    id: Optional[int] = None
+    msg: Optional[str] = None
+
+
+class MaintenanceMonitorsIn(BaseModel):
+    """Replace the monitor set assigned to a maintenance window."""
+    monitor_ids: list[int] = Field(min_length=1, max_length=2000)

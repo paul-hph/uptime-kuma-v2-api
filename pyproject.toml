@@ -1,6 +1,6 @@
 [project]
 name = "uptime-kuma-v2-api"
-version = "0.6.0"
+version = "0.7.0"
 description = "A small self-hostable REST API for Uptime Kuma 2.x"
 readme = "README.md"
 requires-python = ">=3.11"

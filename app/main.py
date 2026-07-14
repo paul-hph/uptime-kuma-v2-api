@@ -24,7 +24,8 @@ from .kuma_client import (
 )
 from .monitors import defaults
 from .monitors.schemas import (
-    ActionResult, BeatsOut, CreateResult, MonitorCreate, MonitorListOut, MonitorNotificationIn,
+    ActionResult, BeatsOut, CreateResult, MaintenanceCreate, MaintenanceCreateResult,
+    MaintenanceMonitorsIn, MonitorCreate, MonitorListOut, MonitorNotificationIn,
     MonitorOut, MonitorPatch, MonitorTagIn, NotificationCreate, NotificationCreateResult,
     StatusPageCreate, StatusPageCreateResult, StatusPageMonitorsIn, StatusPageMonitorsResult,
     TagCreate, TagOut, TagsOut,
@@ -321,10 +322,12 @@ async def create_notification(request: Request, body: NotificationCreate):
         "applyExisting": body.applyExisting,
         **body.config,
     }
-    # addNotification(notification, notificationID): null id => create
-    resp = await kcall("addNotification", (payload, None), mutation=True)
+    if body.id is not None:
+        payload["id"] = body.id
+    # addNotification(notification, notificationID): null id => create, else update in place
+    resp = await kcall("addNotification", (payload, body.id), mutation=True)
     nid = resp.get("id") if isinstance(resp, dict) else None
-    return NotificationCreateResult(id=nid, msg=resp.get("msg") if isinstance(resp, dict) else None)
+    return NotificationCreateResult(id=nid or body.id, msg=resp.get("msg") if isinstance(resp, dict) else None)
 
 
 @app.post("/v1/monitors/{monitor_id}/notifications", dependencies=[Depends(require_api_key)],
@@ -348,6 +351,47 @@ async def set_monitor_notification(request: Request, monitor_id: int, body: Moni
         merged["conditions"] = []
     out = await kcall("editMonitor", merged, mutation=True)
     return ActionResult(msg=out.get("msg") if isinstance(out, dict) else None)
+
+
+# ---------------- maintenance ----------------
+@app.post("/v1/maintenances", dependencies=[Depends(require_api_key)],
+          response_model=MaintenanceCreateResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def create_maintenance(request: Request, body: MaintenanceCreate):
+    """Create a maintenance window. Assign monitors via POST /v1/maintenances/{id}/monitors.
+
+    While a window is active, Kuma suppresses notifications for the assigned monitors.
+    A recurring `timeRange` may cross midnight (Kuma adds 24h when end < start).
+    """
+    date_range = body.dateRange if len(body.dateRange) == 2 else [None, None]
+    payload = {
+        "title": body.title,
+        "description": body.description,
+        "strategy": body.strategy,
+        "intervalDay": body.intervalDay,
+        "dateRange": date_range,
+        "timeRange": [t.model_dump() for t in body.timeRange],
+        "weekdays": body.weekdays,
+        "daysOfMonth": body.daysOfMonth,
+        "timezoneOption": body.timezoneOption,
+        "active": body.active,
+    }
+    if body.strategy == "cron":
+        payload["cron"] = body.cron
+        payload["durationMinutes"] = body.durationMinutes
+    resp = await kcall("addMaintenance", payload, mutation=True)
+    mid = resp.get("maintenanceID") if isinstance(resp, dict) else None
+    return MaintenanceCreateResult(id=mid, msg=resp.get("msg") if isinstance(resp, dict) else None)
+
+
+@app.post("/v1/maintenances/{maintenance_id}/monitors", dependencies=[Depends(require_api_key)],
+          response_model=ActionResult)
+@limiter.limit(settings.RATE_LIMIT)
+async def set_maintenance_monitors(request: Request, maintenance_id: int, body: MaintenanceMonitorsIn):
+    """Set the monitors assigned to a maintenance window (replaces the whole set)."""
+    monitors = [{"id": i} for i in body.monitor_ids]
+    resp = await kcall("addMonitorMaintenance", (maintenance_id, monitors), mutation=True)
+    return ActionResult(msg=resp.get("msg") if isinstance(resp, dict) else None)
 
 
 # ---------------- status pages ----------------
